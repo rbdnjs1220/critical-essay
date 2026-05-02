@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>상호문화 비평문 게시판</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/firebase/9.23.0/firebase-app-compat.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/firebase/9.23.0/firebase-database-compat.min.js"></script>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: -apple-system, BlinkMacSystemFont, 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif; background: #f0f0f5; min-height: 100vh; padding: 24px 16px; }
+.app { max-width: 560px; margin: 0 auto; }
+.screen { display: none; }
+.screen.active { display: block; }
+
+.setup-card { background: #fff; border-radius: 16px; padding: 2rem 1.5rem; box-shadow: 0 4px 24px rgba(0,0,0,0.10); }
+.setup-title { font-size: 20px; font-weight: 700; color: #1c1c1e; margin-bottom: 6px; text-align: center; }
+.setup-sub { font-size: 13px; color: #888; text-align: center; margin-bottom: 1.5rem; line-height: 1.6; }
+.field { margin-bottom: 12px; }
+.field label { font-size: 12px; color: #888; display: block; margin-bottom: 5px; }
+.field input, .field select { width: 100%; border: 1.5px solid #e5e5ea; border-radius: 10px; padding: 9px 13px; font-size: 15px; color: #1c1c1e; outline: none; font-family: inherit; background: #f7f7f9; transition: border-color 0.15s; }
+.field input:focus, .field select:focus { border-color: #7F77DD; background: #fff; }
+.grade-row { display: flex; gap: 8px; }
+.grade-row .field { flex: 1; }
+.start-btn { width: 100%; padding: 13px; border-radius: 12px; border: none; background: #7F77DD; color: #fff; font-size: 15px; font-weight: 600; cursor: pointer; font-family: inherit; transition: opacity 0.15s; margin-top: 4px; }
+.start-btn:hover { opacity: 0.85; }
+.start-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+.board { display: flex; flex-direction: column; gap: 1rem; }
+.board-header { display: flex; align-items: center; justify-content: space-between; }
+.board-title { font-size: 17px; font-weight: 700; color: #1c1c1e; }
+.user-badge { font-size: 12px; padding: 4px 11px; border-radius: 12px; background: #EEEDFE; color: #3C3489; }
+.sub-row { display: flex; align-items: center; justify-content: space-between; }
+.sync-bar { display: flex; align-items: center; font-size: 11px; color: #aaa; gap: 6px; }
+.sync-dot { width: 7px; height: 7px; border-radius: 50%; background: #1D9E75; animation: pulse 2s infinite; }
+@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
+.room-info { font-size: 11px; color: #aaa; }
+
+.write-area { background: #fff; border: 1px solid #e5e5ea; border-radius: 14px; padding: 1rem; }
+.write-label { font-size: 13px; font-weight: 600; color: #1c1c1e; margin-bottom: 3px; }
+.write-sublabel { font-size: 12px; color: #888; margin-bottom: 10px; }
+.write-area textarea { width: 100%; border: 1px solid #e5e5ea; border-radius: 10px; padding: 9px 12px; font-size: 13px; background: #f7f7f9; color: #1c1c1e; outline: none; font-family: inherit; resize: none; height: 100px; transition: border-color 0.15s; }
+.write-area textarea:focus { border-color: #7F77DD; background: #fff; }
+.post-btn { padding: 8px 20px; border-radius: 10px; border: none; font-size: 13px; font-weight: 600; cursor: pointer; font-family: inherit; color: #fff; background: #7F77DD; margin-top: 10px; transition: opacity 0.15s; }
+.post-btn:hover { opacity: 0.85; }
+
+.posts { display: flex; flex-direction: column; gap: 12px; }
+.post-card { background: #fff; border: 1px solid #e5e5ea; border-radius: 14px; padding: 1rem; }
+.post-top { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+.post-avatar { width: 30px; height: 30px; border-radius: 50%; background: #EEEDFE; color: #3C3489; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 600; flex-shrink: 0; }
+.post-name { font-size: 13px; font-weight: 600; color: #1c1c1e; }
+.post-time { font-size: 11px; color: #bbb; margin-left: auto; }
+.del-btn { font-size: 11px; color: #ddd; background: #f7f7f9; border: none; cursor: pointer; font-family: inherit; padding: 2px 6px; margin-left: 4px; border-radius: 6px; }
+.del-btn:hover { color: #E24B4A; background: #FFF0F0; }
+.post-body { font-size: 14px; color: #1c1c1e; line-height: 1.7; margin-bottom: 10px; word-break: keep-all; white-space: pre-wrap; }
+.comments { border-top: 1px solid #f0f0f5; padding-top: 10px; display: flex; flex-direction: column; gap: 8px; }
+.comment { display: flex; gap: 8px; align-items: flex-start; }
+.comment-avatar { width: 22px; height: 22px; border-radius: 50%; background: #f0f0f5; color: #888; display: flex; align-items: center; justify-content: center; font-size: 10px; font-weight: 600; flex-shrink: 0; margin-top: 2px; }
+.comment-body { flex: 1; }
+.comment-name-row { display: flex; align-items: center; gap: 4px; }
+.comment-name { font-size: 11px; font-weight: 600; color: #888; }
+.comment-del { font-size: 10px; color: #ddd; background: none; border: none; cursor: pointer; }
+.comment-del:hover { color: #E24B4A; }
+.comment-text { font-size: 13px; color: #1c1c1e; line-height: 1.5; }
+.comment-input-row { display: flex; gap: 6px; align-items: center; margin-top: 8px; }
+.comment-input-row input { flex: 1; border: 1px solid #e5e5ea; border-radius: 14px; padding: 6px 12px; font-size: 12px; background: #f7f7f9; color: #1c1c1e; outline: none; font-family: inherit; }
+.comment-input-row input:focus { border-color: #7F77DD; }
+.cmnt-btn { padding: 6px 14px; border-radius: 12px; border: none; font-size: 12px; font-weight: 600; cursor: pointer; font-family: inherit; color: #fff; background: #7F77DD; }
+.empty { text-align: center; color: #bbb; font-size: 13px; padding: 2.5rem; }
+</style>
+</head>
+<body>
+<div class="app">
+
+  <div class="screen active" id="s-setup">
+    <div class="setup-card">
+      <div class="setup-title">상호문화 비평문 게시판</div>
+      <div class="setup-sub">이름과 학년·반을 입력하면<br>같은 반 학생들과 함께해요!</div>
+      <div class="field">
+        <label>이름</label>
+        <input id="inp-name" type="text" placeholder="예) 김민준" maxlength="10" oninput="checkSetup()" />
+      </div>
+      <div class="grade-row">
+        <div class="field">
+          <label>학년</label>
+          <select id="inp-grade" onchange="checkSetup()">
+            <option value="">선택</option>
+            <option>1학년</option>
+            <option>2학년</option>
+            <option>3학년</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>반</label>
+          <select id="inp-class" onchange="checkSetup()">
+            <option value="">선택</option>
+            <option>1반</option><option>2반</option><option>3반</option>
+            <option>4반</option><option>5반</option><option>6반</option>
+            <option>7반</option><option>8반</option><option>9반</option>
+            <option>10반</option>
+          </select>
+        </div>
+      </div>
+      <button class="start-btn" id="start-btn" onclick="startBoard()" disabled>시작하기 →</button>
+    </div>
+  </div>
+
+  <div class="screen" id="s-board">
+    <div class="board">
+      <div class="board-header">
+        <div class="board-title">상호문화 비평문 게시판</div>
+        <div class="user-badge" id="user-badge"></div>
+      </div>
+      <div class="sub-row">
+        <div class="sync-bar"><span class="sync-dot"></span> 실시간 공유 중</div>
+        <div class="room-info" id="room-info"></div>
+      </div>
+      <div class="write-area">
+        <div class="write-label">나의 상호문화 비평문을 올려봐요!</div>
+        <div class="write-sublabel">본조아리랑과 베오꽃과 구름을 식민지배 시대라는 공통 배경으로 비교하여 써봅시다.</div>
+        <textarea id="write-text" placeholder="예) 본조아리랑의 '님'은 표면적으로는 연인이지만, 식민지배 시절에는 빼앗긴 조국을..."></textarea>
+        <button class="post-btn" onclick="addPost()">올리기</button>
+      </div>
+      <div class="posts" id="posts-area"><div class="empty">아직 글이 없어요. 첫 번째로 올려봐요!</div></div>
+    </div>
+  </div>
+
+</div>
+<script>
+const DB_URL = 'https://criticalessay-b8b4c-default-rtdb.firebaseio.com';
+firebase.initializeApp({ databaseURL: DB_URL });
+const db = firebase.database();
+
+let myName = '', roomKey = '';
+let currentListener = null;
+
+function checkSetup() {
+  const n = document.getElementById('inp-name').value.trim();
+  const g = document.getElementById('inp-grade').value;
+  const c = document.getElementById('inp-class').value;
+  document.getElementById('start-btn').disabled = !(n && g && c);
+}
+
+function startBoard() {
+  myName = document.getElementById('inp-name').value.trim();
+  const grade = document.getElementById('inp-grade').value;
+  const cls = document.getElementById('inp-class').value;
+  if (!myName || !grade || !cls) return;
+  roomKey = (grade + cls).replace(/\s/g, '');
+  document.getElementById('room-info').textContent = grade + ' ' + cls;
+  document.getElementById('user-badge').textContent = myName;
+  document.getElementById('s-setup').className = 'screen';
+  document.getElementById('s-board').className = 'screen active';
+  listenPosts();
+}
+
+function now() {
+  const d = new Date();
+  return d.getHours() + ':' + String(d.getMinutes()).padStart(2, '0');
+}
+
+function getRef() {
+  return db.ref('review_board/' + roomKey);
+}
+
+function listenPosts() {
+  if (currentListener) currentListener();
+  const ref = getRef();
+  const handler = ref.on('value', snap => {
+    const data = snap.val() || {};
+    const list = Object.entries(data).map(([id, v]) => ({ id, ...v })).sort((a, b) => b.ts - a.ts);
+    renderPosts(list);
+  });
+  currentListener = () => ref.off('value', handler);
+}
+
+function addPost() {
+  const text = document.getElementById('write-text').value.trim();
+  if (!text) return;
+  getRef().push({ name: myName, text, time: now(), ts: Date.now(), comments: {} });
+  document.getElementById('write-text').value = '';
+}
+
+function deletePost(id, writerName) {
+  if (writerName !== myName) { alert('본인이 쓴 글만 삭제할 수 있어요.'); return; }
+  if (confirm('이 글을 삭제할까요?')) getRef().child(id).remove();
+}
+
+function addComment(postId) {
+  const inp = document.getElementById('cinp-' + postId);
+  const text = inp.value.trim();
+  if (!text) return;
+  getRef().child(postId + '/comments').push({ name: myName, text, ts: Date.now() });
+  inp.value = '';
+}
+
+function deleteComment(postId, commentId, writerName) {
+  if (writerName !== myName) { alert('본인이 쓴 댓글만 삭제할 수 있어요.'); return; }
+  getRef().child(postId + '/comments/' + commentId).remove();
+}
+
+function renderPosts(list) {
+  const area = document.getElementById('posts-area');
+  if (list.length === 0) { area.innerHTML = '<div class="empty">아직 글이 없어요. 첫 번째로 올려봐요!</div>'; return; }
+  area.innerHTML = '';
+  list.forEach(p => {
+    const card = document.createElement('div');
+    card.className = 'post-card';
+    const isMe = p.name === myName;
+    const comments = p.comments ? Object.entries(p.comments).sort((a, b) => a[1].ts - b[1].ts) : [];
+    const commentsHTML = comments.map(([cid, c]) => `
+      <div class="comment">
+        <div class="comment-avatar">${c.name.slice(0,2)}</div>
+        <div class="comment-body">
+          <div class="comment-name-row">
+            <span class="comment-name">${c.name}</span>
+            ${c.name === myName ? `<button class="comment-del" onclick="deleteComment('${p.id}','${cid}','${c.name}')">✕</button>` : ''}
+          </div>
+          <div class="comment-text">${c.text}</div>
+        </div>
+      </div>`).join('');
+    card.innerHTML = `
+      <div class="post-top">
+        <div class="post-avatar">${p.name.slice(0,2)}</div>
+        <div class="post-name">${p.name}</div>
+        <div class="post-time">${p.time}</div>
+        ${isMe ? `<button class="del-btn" onclick="deletePost('${p.id}','${p.name}')">✕ 삭제</button>` : ''}
+      </div>
+      <div class="post-body">${p.text}</div>
+      <div class="comments">
+        ${commentsHTML}
+        <div class="comment-input-row">
+          <input id="cinp-${p.id}" type="text" placeholder="댓글 달기..." onkeydown="if(event.key==='Enter') addComment('${p.id}')" />
+          <button class="cmnt-btn" onclick="addComment('${p.id}')">등록</button>
+        </div>
+      </div>`;
+    area.appendChild(card);
+  });
+}
+</script>
+</body>
+</html>
